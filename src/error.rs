@@ -10,6 +10,9 @@ pub enum AppError {
 
     #[error("API error: {0}")]
     Api(#[from] ApiError),
+
+    #[error("Web scraping error: {0}")]
+    Scraping(String),
     // Add other application-specific errors here if needed
 }
 

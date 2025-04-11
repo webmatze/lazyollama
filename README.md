@@ -9,6 +9,7 @@ A terminal user interface (TUI) application for managing local Ollama models, wr
 *   **List Models:** Displays a scrollable list of locally installed Ollama models.
 *   **Inspect Models:** Shows detailed information for the selected model (size, modification date, digest, family, parameters, etc.).
 *   **Delete Models:** Allows deleting the selected model with a confirmation prompt.
+*   **Install Models:** Allows to pull new models from the ollama registry.
 *   **Environment Variable:** Uses `OLLAMA_HOST` environment variable for the Ollama API endpoint (defaults to `http://localhost:11434`).
 
 ## Installation
@@ -48,6 +49,7 @@ A terminal user interface (TUI) application for managing local Ollama models, wr
 *   `d`: Initiate deletion of the selected model (shows confirmation).
 *   `y` / `Y`: Confirm deletion (when in confirmation mode).
 *   `n` / `N` / `Esc`: Cancel deletion (when in confirmation mode).
+*   `i`: Install/Pull new models
 
 ## Dependencies
 

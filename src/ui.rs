@@ -26,12 +26,19 @@ pub fn draw(f: &mut Frame, app: &AppState) {
     draw_model_details(f, app, main_chunks[1]);
     draw_status_bar(f, app, chunks[1]);
 
-    // Draw confirmation dialog if needed
-    if app.current_mode == AppMode::ConfirmDelete {
-        if let Some(model_name) = app.get_selected_model_name() {
-             draw_confirmation_dialog(f, &model_name);
+    // --- Render Modals ---
+    match app.current_mode {
+        AppMode::ConfirmDelete => {
+            if let Some(model_name) = app.get_selected_model_name() {
+                draw_confirmation_dialog(f, &model_name);
+            }
         }
+        AppMode::InstallSelectModel => draw_install_model_select_dialog(f, app),
+        AppMode::InstallSelectTag => draw_install_tag_select_dialog(f, app),
+        AppMode::InstallConfirm => draw_install_confirm_dialog(f, app),
+        _ => {} // No modal for Normal or Installing modes
     }
+    // --- End Render Modals ---
 }
 
 fn draw_model_list(f: &mut Frame, app: &AppState, area: Rect) {
@@ -131,12 +138,31 @@ fn draw_model_details(f: &mut Frame, app: &AppState, area: Rect) {
 }
 
 fn draw_status_bar(f: &mut Frame, app: &AppState, area: Rect) {
-    let status_text = match &app.status_message {
-        Some(msg) => msg.clone(),
-        None => "q: Quit | ↓/j: Down | ↑/k: Up | d: Delete".to_string(),
+    // Determine status text based on mode, errors, and status messages
+    let status_text = if let Some(err) = &app.install_error {
+        // Prioritize showing errors
+        format!("Error: {}", err).red().to_string() // Assuming Stylize trait is used
+    } else if let Some(status) = &app.install_status {
+         // Show installation status if present
+        status.clone().yellow().to_string()
+    } else {
+         // Otherwise, show mode-specific help or general status
+        match app.current_mode {
+            AppMode::Normal => app.status_message.clone().unwrap_or_else(||
+                "q: Quit | ↓/j: Down | ↑/k: Up | d: Delete | i: Install".to_string()
+            ),
+            AppMode::ConfirmDelete => "Confirm delete? (y/N)".to_string(),
+            AppMode::InstallSelectModel => "↑/↓: Select | Enter: Choose Tags | Esc: Cancel".to_string(),
+            AppMode::InstallSelectTag => "↑/↓: Select | Enter: Confirm | Esc: Back".to_string(),
+            AppMode::InstallConfirm => "Confirm install? (y/N) | Esc: Back".to_string(),
+            AppMode::Installing => app.install_status.clone().unwrap_or_else(|| "Installing...".to_string()), // Should be covered by install_status check above, but as fallback
+        }
     };
 
-    let paragraph = Paragraph::new(Line::from(status_text))
+    // Convert String to Line for Paragraph
+    let status_line = Line::from(status_text);
+
+    let paragraph = Paragraph::new(status_line) // Use the determined status_line
         .style(Style::default().bg(Color::DarkGray));
 
     f.render_widget(paragraph, area);
@@ -153,6 +179,101 @@ fn draw_confirmation_dialog(f: &mut Frame, model_name: &str) {
     let paragraph = Paragraph::new(text)
         .block(block)
         .wrap(Wrap { trim: true });
+
+    let area = centered_rect(60, 20, f.size());
+
+    f.render_widget(Clear, area);
+    f.render_widget(paragraph, area);
+}
+
+
+fn draw_install_model_select_dialog(f: &mut Frame, app: &AppState) {
+    let block = Block::default()
+        .title("Install Model: Select Model")
+        .borders(Borders::ALL)
+        .style(Style::default().bg(Color::DarkGray));
+
+    let area = centered_rect(70, 50, f.size()); // Adjust size as needed
+
+    f.render_widget(Clear, area); // Clear the area
+
+    if app.is_fetching_registry {
+        let loading_text = Paragraph::new("Loading models...")
+            .block(block)
+            .alignment(ratatui::layout::Alignment::Center);
+        f.render_widget(loading_text, area);
+    } else {
+        let items: Vec<ListItem> = app
+            .registry_models
+            .iter()
+            .map(|m| ListItem::new(Line::from(m.clone())))
+            .collect();
+
+        let list = List::new(items)
+            .block(block)
+            .highlight_style(
+                Style::default()
+                    .bg(Color::LightBlue)
+                    .add_modifier(Modifier::BOLD),
+            )
+            .highlight_symbol("> ");
+
+        let mut list_state = app.registry_model_list_state.clone();
+        f.render_stateful_widget(list, area, &mut list_state);
+    }
+}
+
+fn draw_install_tag_select_dialog(f: &mut Frame, app: &AppState) {
+    let model_name = app.selected_registry_model.as_deref().unwrap_or("Unknown");
+    let title = format!("Install Model: Select Tag for '{}'", model_name);
+    let block = Block::default()
+        .title(title)
+        .borders(Borders::ALL)
+        .style(Style::default().bg(Color::DarkGray));
+
+    let area = centered_rect(60, 50, f.size()); // Adjust size as needed
+
+    f.render_widget(Clear, area); // Clear the area
+
+    if app.is_fetching_registry {
+        let loading_text = Paragraph::new("Loading tags...")
+            .block(block)
+            .alignment(ratatui::layout::Alignment::Center);
+        f.render_widget(loading_text, area);
+    } else {
+        let items: Vec<ListItem> = app
+            .registry_tags
+            .iter()
+            .map(|t| ListItem::new(Line::from(t.clone())))
+            .collect();
+
+        let list = List::new(items)
+            .block(block)
+            .highlight_style(
+                Style::default()
+                    .bg(Color::LightBlue)
+                    .add_modifier(Modifier::BOLD),
+            )
+            .highlight_symbol("> ");
+
+        let mut list_state = app.registry_tag_list_state.clone();
+        f.render_stateful_widget(list, area, &mut list_state);
+    }
+}
+
+fn draw_install_confirm_dialog(f: &mut Frame, app: &AppState) {
+    let model = app.selected_registry_model.as_deref().unwrap_or("??");
+    let tag = app.selected_registry_tag.as_deref().unwrap_or("??");
+    let block = Block::default()
+        .title("Confirm Installation")
+        .borders(Borders::ALL)
+        .style(Style::default().bg(Color::DarkGray));
+
+    let text = format!("Install model '{}:{}'? (y/N)", model, tag);
+    let paragraph = Paragraph::new(text)
+        .block(block)
+        .wrap(Wrap { trim: true })
+        .alignment(ratatui::layout::Alignment::Center);
 
     let area = centered_rect(60, 20, f.size());
 
