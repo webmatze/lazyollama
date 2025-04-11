@@ -15,31 +15,95 @@ A terminal user interface (TUI) application for managing local Ollama models, wr
 
 ## Installation
 
-1.  **Prerequisites:**
-    *   Rust toolchain (Install from [rustup.rs](https://rustup.rs/))
-    *   A running Ollama instance ([ollama.com](https://ollama.com/))
-2.  **Clone the repository:**
-    ```bash
-    git clone https://github.com/webmatze/lazyollama.git
-    cd lazyollama
-    ```
-3.  **Build the application:**
-    ```bash
-    cargo build --release
-    ```
-    The executable will be located at `target/release/lazyollama`.
+### Prerequisites
+
+*   Rust toolchain (Install from [rustup.rs](https://rustup.rs/))
+*   A running Ollama instance ([ollama.com](https://ollama.com/))
+
+### Method 1: Using the Installation Script (Recommended)
+
+This is the simplest way to build and install LazyOllama to a system-wide location:
+
+```bash
+# 1. Clone the repository
+git clone https://github.com/webmatze/lazyollama.git
+cd lazyollama
+
+# 2. Run the installation script
+chmod +x install.sh
+./install.sh
+```
+
+The script will:
+- Check for required dependencies
+- Build the release version
+- Install it to the appropriate location for your OS (typically `/usr/local/bin` on Unix-like systems)
+- Set appropriate permissions
+
+### Method 2: Using Cargo Install
+
+If you have Rust installed, you can install directly using Cargo:
+
+```bash
+# 1. Clone the repository
+git clone https://github.com/webmatze/lazyollama.git
+cd lazyollama
+
+# 2. Install using cargo
+cargo install --path .
+```
+
+This will install the binary to your Cargo bin directory (typically `~/.cargo/bin/`), which should be in your PATH.
+
+### Method 3: Manual Build and Installation
+
+If you prefer to manually build and place the binary:
+
+```bash
+# 1. Clone the repository
+git clone https://github.com/webmatze/lazyollama.git
+cd lazyollama
+
+# 2. Build the application
+cargo build --release
+
+# 3. Copy the binary to a location in your PATH (optional)
+# On Linux/macOS (may require sudo)
+sudo cp target/release/lazyollama /usr/local/bin/
+```
+
+The executable will be located at `target/release/lazyollama`.
+
+### Platform-Specific Considerations
+
+- **Linux/macOS**: Installation to system directories (like `/usr/local/bin`) typically requires root privileges (sudo).
+- **Windows**: The installation script will attempt to install to an appropriate location, but you may need to adjust your PATH environment variable.
+
+### Verifying Installation
+
+After installation, verify that lazyollama is correctly installed and accessible:
+
+```bash
+# Check if the command is available
+which lazyollama
+
+# Run lazyollama
+lazyollama
+```
+
+If the command isn't found, ensure the installation location is in your PATH.
 
 ## Usage
 
 1.  **Run the application:**
     ```bash
-    ./target/release/lazyollama
+    lazyollama
     ```
 2.  **Set Custom Ollama Host (Optional):**
     If your Ollama instance is running on a different host or port, set the `OLLAMA_HOST` environment variable before running:
     ```bash
     export OLLAMA_HOST="http://your-ollama-host:port"
-    ./target/release/lazyollama
+    lazyollama
     ```
 
 ## Keybindings
