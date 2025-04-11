@@ -12,6 +12,7 @@ pub enum AppMode {
     InstallSelectTag,   // New: Selecting tag for the chosen model
     InstallConfirm,     // New: Confirming the installation
     Installing,         // New: Installation in progress
+    RunningOllama,     // New: Running 'ollama run' interactively
 }
 
 #[derive(Debug, Clone)]

@@ -7,6 +7,7 @@ A terminal user interface (TUI) application for managing local Ollama models, wr
 ## Features
 
 *   **List Models:** Displays a scrollable list of locally installed Ollama models.
+*   **Run Models:** Run any of the locally installed Ollama models.
 *   **Inspect Models:** Shows detailed information for the selected model (size, modification date, digest, family, parameters, etc.).
 *   **Delete Models:** Allows deleting the selected model with a confirmation prompt.
 *   **Install Models:** Allows to pull new models from the ollama registry.
@@ -50,6 +51,7 @@ A terminal user interface (TUI) application for managing local Ollama models, wr
 *   `y` / `Y`: Confirm deletion (when in confirmation mode).
 *   `n` / `N` / `Esc`: Cancel deletion (when in confirmation mode).
 *   `i`: Install/Pull new models
+*   `Enter`: Run selected model in ollama
 
 ## Dependencies
 

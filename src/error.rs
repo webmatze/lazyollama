@@ -13,6 +13,9 @@ pub enum AppError {
 
     #[error("Web scraping error: {0}")]
     Scraping(String),
+
+    #[error("External command error: {0}")]
+    Command(String),
     // Add other application-specific errors here if needed
 }
 

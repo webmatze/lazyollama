@@ -149,13 +149,14 @@ fn draw_status_bar(f: &mut Frame, app: &AppState, area: Rect) {
          // Otherwise, show mode-specific help or general status
         match app.current_mode {
             AppMode::Normal => app.status_message.clone().unwrap_or_else(||
-                "q: Quit | ↓/j: Down | ↑/k: Up | d: Delete | i: Install".to_string()
+                "q: Quit | ↓/j: Down | ↑/k: Up | d: Delete | i: Install | Enter: Run Model".to_string()
             ),
             AppMode::ConfirmDelete => "Confirm delete? (y/N)".to_string(),
             AppMode::InstallSelectModel => "↑/↓: Select | Enter: Choose Tags | Esc: Cancel".to_string(),
             AppMode::InstallSelectTag => "↑/↓: Select | Enter: Confirm | Esc: Back".to_string(),
             AppMode::InstallConfirm => "Confirm install? (y/N) | Esc: Back".to_string(),
             AppMode::Installing => app.install_status.clone().unwrap_or_else(|| "Installing...".to_string()), // Should be covered by install_status check above, but as fallback
+            AppMode::RunningOllama => "Running ollama... (TUI Suspended)".to_string(),
         }
     };
 
