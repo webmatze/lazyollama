@@ -1,4 +1,5 @@
 # lazyollama - A Ollama TUI
+![easy_llama_easy_life](https://github.com/user-attachments/assets/8dc90386-4f91-47d5-81c9-37e30feaea17)
 
 A terminal user interface (TUI) application for managing local Ollama models, written in Rust.
 
