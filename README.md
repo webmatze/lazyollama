@@ -2,7 +2,7 @@
 
 A terminal user interface (TUI) application for managing local Ollama models, written in Rust.
 
-![Ollama TUI Screenshot](docs/lazyollama.png)
+https://github.com/user-attachments/assets/5fcdb0eb-c398-4662-aed9-4fd8359d7063
 
 ## Features
 
