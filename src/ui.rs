@@ -10,6 +10,45 @@ use ratatui::{
     Frame,
 };
 
+fn draw_help_modal(f: &mut Frame) {
+    let block = Block::default()
+        .title("Help - Shortcuts")
+        .borders(Borders::ALL)
+        .style(Style::default().bg(Color::DarkGray)); // Use a background color
+
+    let help_text = vec![
+        Line::from(Span::styled("--- General ---", Style::default().bold().underlined())),
+        Line::from("  q          : Quit"),
+        Line::from("  h / ?      : Show/Hide Help"),
+        Line::from(""),
+        Line::from(Span::styled("--- Model List ---", Style::default().bold().underlined())),
+        Line::from("  ↓ / j      : Move Down"),
+        Line::from("  ↑ / k      : Move Up"),
+        Line::from("  d          : Delete Selected Model (Opens Confirm Dialog)"),
+        Line::from("  i          : Install New Model (Opens Install Dialog)"),
+        Line::from("  Enter      : Run Selected Model (Suspends TUI)"),
+        Line::from(""),
+        Line::from(Span::styled("--- Dialogs ---", Style::default().bold().underlined())),
+        Line::from("  y / Y      : Confirm Action"),
+        Line::from("  n / N / Esc: Cancel / Go Back"),
+        Line::from(""),
+        Line::from(Span::styled("--- Help Dialog ---", Style::default().bold().underlined())),
+        Line::from("  h/?/q/Esc  : Close Help"),
+
+    ];
+
+    let paragraph = Paragraph::new(help_text)
+        .block(block)
+        .wrap(Wrap { trim: false }); // Don't trim lines
+
+    // Adjust size as needed, maybe make it taller
+    let area = centered_rect(80, 70, f.size());
+
+    f.render_widget(Clear, area); // Clear the area behind the modal
+    f.render_widget(paragraph, area);
+}
+
+
 pub fn draw(f: &mut Frame, app: &AppState) {
     // Main layout: 90% for content, 10% for status bar
     let chunks = Layout::default()
@@ -36,6 +75,7 @@ pub fn draw(f: &mut Frame, app: &AppState) {
         AppMode::InstallSelectModel => draw_install_model_select_dialog(f, app),
         AppMode::InstallSelectTag => draw_install_tag_select_dialog(f, app),
         AppMode::InstallConfirm => draw_install_confirm_dialog(f, app),
+        AppMode::Help => draw_help_modal(f), // Add call to draw help modal
         _ => {} // No modal for Normal or Installing modes
     }
     // --- End Render Modals ---
@@ -157,6 +197,7 @@ fn draw_status_bar(f: &mut Frame, app: &AppState, area: Rect) {
             AppMode::InstallConfirm => "Confirm install? (y/N) | Esc: Back".to_string(),
             AppMode::Installing => app.install_status.clone().unwrap_or_else(|| "Installing...".to_string()), // Should be covered by install_status check above, but as fallback
             AppMode::RunningOllama => "Running ollama... (TUI Suspended)".to_string(),
+            AppMode::Help => "h/?/q/Esc: Close Help".to_string(), // Add status for Help mode
         }
     };
 
@@ -281,6 +322,7 @@ fn draw_install_confirm_dialog(f: &mut Frame, app: &AppState) {
     f.render_widget(Clear, area);
     f.render_widget(paragraph, area);
 }
+
 
 /// Helper function to create a centered rectangle.
 fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {

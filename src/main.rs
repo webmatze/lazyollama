@@ -182,6 +182,10 @@ async fn run_app<B: Backend>(
                                 match current_mode {
                                     AppMode::Normal => match key.code {
                                         KeyCode::Char('q') => app.should_quit = true,
+                                        KeyCode::Char('h') | KeyCode::Char('?') => {
+                                            app.current_mode = AppMode::Help;
+                                            app.status_message = None; // Clear status for help modal
+                                        }
                                         KeyCode::Char('j') | KeyCode::Down => app.next_model(),
                                         KeyCode::Char('k') | KeyCode::Up => app.previous_model(),
                                         KeyCode::Char('d') => {
@@ -446,6 +450,14 @@ async fn run_app<B: Backend>(
                                     }
                                     // RunningOllama is handled in the outer if/else
                                     AppMode::RunningOllama => unreachable!(), // Should not be reached here
+                                    AppMode::Help => match key.code {
+                                        // Dismiss help with h, ?, q, or Esc
+                                        KeyCode::Char('h') | KeyCode::Char('?') | KeyCode::Char('q') | KeyCode::Esc => {
+                                            app.current_mode = AppMode::Normal;
+                                            app.status_message = None;
+                                        }
+                                        _ => {} // Ignore other keys in help mode
+                                    }
                                 }
                                 // --- End Input Handling ---
                             }

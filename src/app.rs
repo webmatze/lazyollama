@@ -13,6 +13,7 @@ pub enum AppMode {
     InstallConfirm,     // New: Confirming the installation
     Installing,         // New: Installation in progress
     RunningOllama,     // New: Running 'ollama run' interactively
+    Help,              // New: Displaying the help modal
 }
 
 #[derive(Debug, Clone)]
