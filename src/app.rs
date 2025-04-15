@@ -13,11 +13,11 @@ pub enum AppMode {
     InstallConfirm,     // New: Confirming the installation
     Installing,         // New: Installation in progress
     RunningOllama,     // New: Running 'ollama run' interactively
+    Help,              // New: Displaying the help modal
 }
 
 #[derive(Debug, Clone)]
 pub struct AppState {
-    pub ollama_host: String,
     pub models: Vec<ModelInfo>,
     pub list_state: ListState,
     pub selected_model_details: Option<ShowModelResponse>,
@@ -37,12 +37,12 @@ pub struct AppState {
     pub install_error: Option<String>, // To store/display install-related errors
     pub install_status: Option<String>, // To show "Pulling..." message
                                         // --- End New fields ---
+    pub previous_mode: Option<AppMode>, // To restore mode after Help
 }
 
 impl AppState {
-    pub fn new(host: String) -> Self {
+    pub fn new() -> Self {
         Self {
-            ollama_host: host,
             models: Vec::new(),
             list_state: ListState::default(),
             selected_model_details: None,
@@ -61,6 +61,7 @@ impl AppState {
             install_error: None,
             install_status: None,
             // --- End Initialize New fields ---
+            previous_mode: None,
         }
     }
 
