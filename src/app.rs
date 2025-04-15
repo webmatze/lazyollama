@@ -18,7 +18,6 @@ pub enum AppMode {
 
 #[derive(Debug, Clone)]
 pub struct AppState {
-    pub ollama_host: String,
     pub models: Vec<ModelInfo>,
     pub list_state: ListState,
     pub selected_model_details: Option<ShowModelResponse>,
@@ -41,9 +40,8 @@ pub struct AppState {
 }
 
 impl AppState {
-    pub fn new(host: String) -> Self {
+    pub fn new() -> Self {
         Self {
-            ollama_host: host,
             models: Vec::new(),
             list_state: ListState::default(),
             selected_model_details: None,

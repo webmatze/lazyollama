@@ -22,7 +22,7 @@ use ratatui::{
     backend::{Backend, CrosstermBackend},
     Terminal,
 };
-use std::process::Command;
+
 use std::{io, time::Duration};
 use tokio::sync::mpsc;
 
@@ -39,7 +39,7 @@ async fn main() -> Result<()> {
     let ollama_host = ollama_api::get_ollama_host();
     // Client needs to be cloneable
     let client = OllamaClient::new(ollama_host.clone());
-    let mut app_state = AppState::new(ollama_host);
+    let mut app_state = AppState::new();
 
     let res = run_app(&mut terminal, client, &mut app_state).await; // Pass client by value
 
