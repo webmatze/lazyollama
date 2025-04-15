@@ -176,18 +176,31 @@ async fn run_app<B: Backend>(
                     match maybe_term_event_res {
                         Ok(Ok(Some(Event::Key(key)))) => { // Successfully read a key event
                             if key.kind == KeyEventKind::Press || key.kind == KeyEventKind::Repeat {
-                                // --- Input Handling Logic (Moved Here) ---
-                                let current_mode = app.current_mode.clone(); // Clone mode for matching
-                                // NOTE: Match only modes relevant when NOT RunningOllama
-                                match current_mode {
-                                    AppMode::Normal => match key.code {
-                                        KeyCode::Char('q') => app.should_quit = true,
+                                // --- Global Input Handling (Before Mode Specific) ---
+                                let mut handled_globally = false;
+                                // Allow help unless running an external command or already in help
+                                if app.current_mode != AppMode::RunningOllama && app.current_mode != AppMode::Help {
+                                    match key.code {
                                         KeyCode::Char('h') | KeyCode::Char('?') => {
+                                            app.previous_mode = Some(app.current_mode.clone());
                                             app.current_mode = AppMode::Help;
-                                            app.status_message = None; // Clear status for help modal
+                                            app.status_message = None;
+                                            handled_globally = true;
                                         }
-                                        KeyCode::Char('j') | KeyCode::Down => app.next_model(),
-                                        KeyCode::Char('k') | KeyCode::Up => app.previous_model(),
+                                        _ => {} // Other potential global keys can go here
+                                    }
+                                }
+
+                                // --- Mode Specific Input Handling ---
+                                if !handled_globally {
+                                    let current_mode = app.current_mode.clone(); // Clone mode for matching
+                                    // NOTE: Match only modes relevant when NOT RunningOllama
+                                    match current_mode {
+                                        AppMode::Normal => match key.code {
+                                            KeyCode::Char('q') => app.should_quit = true,
+                                            // 'h'/'?' is handled globally now
+                                            KeyCode::Char('j') | KeyCode::Down => app.next_model(),
+                                            KeyCode::Char('k') | KeyCode::Up => app.previous_model(),
                                         KeyCode::Char('d') => {
                                             if app.list_state.selected().is_some() {
                                                 app.current_mode = AppMode::ConfirmDelete;
@@ -453,11 +466,13 @@ async fn run_app<B: Backend>(
                                     AppMode::Help => match key.code {
                                         // Dismiss help with h, ?, q, or Esc
                                         KeyCode::Char('h') | KeyCode::Char('?') | KeyCode::Char('q') | KeyCode::Esc => {
-                                            app.current_mode = AppMode::Normal;
+                                            // Restore previous mode, default to Normal if None was stored
+                                            app.current_mode = app.previous_mode.take().unwrap_or(AppMode::Normal);
                                             app.status_message = None;
                                         }
                                         _ => {} // Ignore other keys in help mode
                                     }
+                                }
                                 }
                                 // --- End Input Handling ---
                             }
@@ -473,7 +488,7 @@ async fn run_app<B: Backend>(
                            break Ok(()); // Likely fatal, exit loop
                         }
                     }
-                }
+                },
 
                 // Branch 2: Handle Async App Events from the channel
                 maybe_app_event = rx.recv() => {

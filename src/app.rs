@@ -37,6 +37,7 @@ pub struct AppState {
     pub install_error: Option<String>, // To store/display install-related errors
     pub install_status: Option<String>, // To show "Pulling..." message
                                         // --- End New fields ---
+    pub previous_mode: Option<AppMode>, // To restore mode after Help
 }
 
 impl AppState {
@@ -60,6 +61,7 @@ impl AppState {
             install_error: None,
             install_status: None,
             // --- End Initialize New fields ---
+            previous_mode: None,
         }
     }
 
