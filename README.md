@@ -20,8 +20,41 @@ https://github.com/user-attachments/assets/5fcdb0eb-c398-4662-aed9-4fd8359d7063
 
 *   Rust toolchain (Install from [rustup.rs](https://rustup.rs/))
 *   A running Ollama instance ([ollama.com](https://ollama.com/))
+*   Homebrew (macOS / Linux) ([brew.sh](https://brew.sh/))
 
-### Method 1: Using the Installation Script (Recommended)
+### Method 1: Homebrew (macOS / Linux) (Recommended)
+
+Install using the official Homebrew tap.
+
+**Option 1 (Tap first, then install):**
+
+```bash
+# Add the custom tap
+brew tap webmatze/tap
+
+# Install the tool
+brew install lazyollama
+```
+
+**Option 2 (Direct install):**
+
+Homebrew can automatically tap and install in one step if you provide the full formula name:
+
+```bash
+brew install webmatze/tap/lazyollama
+```
+
+**Upgrading:**
+
+To upgrade to the latest version:
+
+```bash
+# Update Homebrew and all formulas (including lazyollama)
+brew update
+brew upgrade lazyollama
+```
+
+### Method 2: Using the Installation Script
 
 This is the simplest way to build and install LazyOllama to a system-wide location:
 
@@ -41,7 +74,7 @@ The script will:
 - Install it to the appropriate location for your OS (typically `/usr/local/bin` on Unix-like systems)
 - Set appropriate permissions
 
-### Method 2: Using Cargo Install
+### Method 3: Using Cargo Install
 
 If you have Rust installed, you can install directly using Cargo:
 
@@ -56,7 +89,7 @@ cargo install --path .
 
 This will install the binary to your Cargo bin directory (typically `~/.cargo/bin/`), which should be in your PATH.
 
-### Method 3: Manual Build and Installation
+### Method 4: Manual Build and Installation
 
 If you prefer to manually build and place the binary:
 
