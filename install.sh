@@ -115,6 +115,10 @@ install_binary() {
         mkdir -p "$INSTALL_DIR" || error "Failed to create installation directory"
     fi
     
+    # Remove existing binary in installation directory
+    info "Removing old lazyollama binary"
+    rm "$INSTALL_DIR/lazyollama"
+
     # Copy binary to installation directory
     info "Installing lazyollama to $INSTALL_DIR..."
     cp "$binary_path" "$INSTALL_DIR/" || error "Failed to copy binary to $INSTALL_DIR"
