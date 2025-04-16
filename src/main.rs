@@ -8,6 +8,7 @@ mod tasks;
 mod tui;
 mod ui;
 
+use clap::Parser;
 use crate::{
     app::{AppMode, AppState},
     error::{AppError, Result},
@@ -22,25 +23,41 @@ use crossterm::{
 use std::time::Duration;
 use tokio::sync::mpsc;
 
-#[tokio::main]
-async fn main() -> Result<()> {
+
+#[derive(Parser, Debug)]
+#[command(author, version, about, long_about = None)] // Reads version from Cargo.toml
+struct CliArgs {
+    // No arguments needed yet, but the struct is required for clap
+    // The `version` attribute on `command` handles the --version flag
+}
+
+// Synchronous main function
+fn main() -> Result<()> {
+    CliArgs::parse();
+
+    let rt = tokio::runtime::Runtime::new().map_err(AppError::Io)?; // Map the std::io::Error to AppError::Io
+    rt.block_on(run_async_app())
+}
+
+async fn run_async_app() -> Result<()> {
     let mut terminal = tui::init_terminal()?;
 
-    let ollama_host = ollama_api::get_ollama_host();
-    let client = OllamaClient::new(ollama_host.clone());
-    let mut app_state = AppState::new();
-
-    let res = run_app(&mut terminal, client, &mut app_state).await;
+    let result = async {
+        let ollama_host = ollama_api::get_ollama_host();
+        let client = OllamaClient::new(ollama_host.clone());
+        let mut app_state = AppState::new();
+        run_app(&mut terminal, client, &mut app_state).await
+    }.await;
 
     tui::restore_terminal(&mut terminal)?;
 
-    if let Err(err) = res {
-        println!("Error running app: {:?}", err);
-        // Consider returning the error if main should indicate failure
-        // return Err(err);
+    if let Err(err) = &result {
+         if !matches!(err, AppError::Io(_)) {
+            eprintln!("Error running app: {:?}", err);
+         }
     }
 
-    Ok(())
+    result
 }
 
 
