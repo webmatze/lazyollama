@@ -81,6 +81,9 @@ pub async fn fetch_registry_tags(model_name: &str) -> Result<Vec<String>> { // U
              model_name
          )))
     } else {
+        // Filter out any tag that exactly matches the model_name
+        tags.retain(|tag| tag != model_name);
+
         // Ensure "latest" tag exists, adding it if necessary
         if !tags.contains(&"latest".to_string()) {
             tags.push("latest".to_string());
