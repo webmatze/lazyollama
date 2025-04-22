@@ -81,8 +81,24 @@ pub async fn fetch_registry_tags(model_name: &str) -> Result<Vec<String>> { // U
              model_name
          )))
     } else {
-        // Often 'latest' is present, maybe sort it to the top? Or just alphabetical.
+        // Ensure "latest" tag exists, adding it if necessary
+        if !tags.contains(&"latest".to_string()) {
+            tags.push("latest".to_string());
+        }
+
+        // Sort all tags alphabetically
         tags.sort();
+
+        // Move "latest" to the front
+        if let Some(pos) = tags.iter().position(|t| t == "latest") {
+            // Only move if it's not already at the front
+            if pos > 0 {
+            let latest_tag = tags.remove(pos);
+            tags.insert(0, latest_tag);
+            }
+        }
+        // If "latest" wasn't found (shouldn't happen here) or was already at pos 0, do nothing.
+
         Ok(tags)
     }
 }
