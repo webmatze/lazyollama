@@ -63,7 +63,12 @@ pub async fn fetch_registry_tags(model_name: &str) -> Result<Vec<String>> { // U
 
     let mut tags = Vec::new();
     for element in document.select(&tag_selector) {
-        let tag_text = element.text().collect::<String>().trim().to_string();
+        let full_text = element.text().collect::<String>().trim().to_string();
+        let tag_text = if let Some(pos) = full_text.find(':') {
+            full_text[pos + 1..].to_string()
+        } else {
+            full_text
+        };
         if !tag_text.is_empty() && !tags.contains(&tag_text) {
             tags.push(tag_text);
         }
