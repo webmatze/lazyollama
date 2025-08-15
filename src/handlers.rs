@@ -4,9 +4,9 @@ use crate::{
     events::AppEvent,
     ollama_api::OllamaClient,
     tasks,
-    tui, // Potentially needed if handlers interact with TUI directly (less ideal)
+    tui,
 };
-use crossterm::event::{KeyCode, KeyEvent, KeyEventKind};
+use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use tokio::sync::mpsc;
 
 type EventSender = mpsc::Sender<AppEvent>;
@@ -21,7 +21,7 @@ pub async fn handle_key_event(
 ) -> Result<bool> {
     if key.kind == KeyEventKind::Press || key.kind == KeyEventKind::Repeat {
         let mut handled_globally = false;
-        if app.current_mode != AppMode::RunningOllama && app.current_mode != AppMode::Help {
+        if app.current_mode != AppMode::RunningOllama && app.current_mode != AppMode::Help && app.current_mode != AppMode::Filter {
             match key.code {
                 KeyCode::Char('h') | KeyCode::Char('?') => {
                     app.previous_mode = Some(app.current_mode.clone());
@@ -40,6 +40,19 @@ pub async fn handle_key_event(
                     KeyCode::Char('q') => return Ok(true),
                     KeyCode::Char('j') | KeyCode::Down => app.next_model(),
                     KeyCode::Char('k') | KeyCode::Up => app.previous_model(),
+                    KeyCode::Char('/') => {
+                        // Enter filter mode
+                        app.current_mode = AppMode::Filter;
+                        app.filter_input.clear();
+                        app.filter_cursor_pos = 0;
+                        app.status_message = None;
+                    }
+                    KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                        // Clear filter with Ctrl+C
+                        if app.is_filtered {
+                            app.clear_filter();
+                        }
+                    }
                     KeyCode::Char('d') => {
                         if app.list_state.selected().is_some() {
                             app.current_mode = AppMode::ConfirmDelete;
@@ -70,6 +83,44 @@ pub async fn handle_key_event(
                                 tasks::run_ollama(tx_clone, model_name_clone).await;
                             });
                         }
+                    }
+                    _ => {}
+                },
+                AppMode::Filter => match key.code {
+                    KeyCode::Char(c) => {
+                        // Add character to filter input
+                        app.filter_input_char(c);
+                    }
+                    KeyCode::Backspace => {
+                        // Remove character from filter input
+                        app.filter_input_backspace();
+                    }
+                    KeyCode::Left => {
+                        app.filter_cursor_left();
+                    }
+                    KeyCode::Right => {
+                        app.filter_cursor_right();
+                    }
+                    KeyCode::Enter => {
+                        // Confirm filter and return to normal mode
+                        app.current_mode = AppMode::Normal;
+                        app.status_message = if app.is_filtered {
+                            Some(format!("Filter: '{}' ({} models)", app.filter_input, app.get_current_models().len()))
+                        } else {
+                            None
+                        };
+                    }
+                    KeyCode::Esc => {
+                        // Cancel filter - clear it and return to normal mode
+                        app.clear_filter();
+                        app.current_mode = AppMode::Normal;
+                        app.status_message = Some("Filter cleared".to_string());
+                    }
+                    KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                        // Clear filter input with Ctrl+C
+                        app.filter_input.clear();
+                        app.filter_cursor_pos = 0;
+                        app.apply_filter();
                     }
                     _ => {}
                 },
@@ -208,7 +259,7 @@ pub async fn handle_key_event(
                 AppMode::Installing => {
                     // Input is ignored while installing.
                 }
-                AppMode::RunningOllama => unreachable!(), // Handled separately in main loop
+                AppMode::RunningOllama => unreachable!(),
                 AppMode::Help => match key.code {
                     KeyCode::Char('h') | KeyCode::Char('?') | KeyCode::Char('q') | KeyCode::Esc => {
                         app.current_mode = app.previous_mode.take().unwrap_or(AppMode::Normal);
@@ -221,7 +272,6 @@ pub async fn handle_key_event(
     }
     Ok(false)
 }
-
 
 /// Handles asynchronous events received from tasks.
 pub fn handle_app_event(event: AppEvent, app: &mut AppState) {
@@ -296,10 +346,17 @@ pub fn handle_app_event(event: AppEvent, app: &mut AppState) {
                 Ok(models) => {
                     let old_selection_index = app.list_state.selected();
                     app.models = models;
-                    let new_selection = if app.models.is_empty() {
+                    
+                    // Reapply filter if it was active
+                    if app.is_filtered {
+                        app.apply_filter();
+                    }
+                    
+                    let current_models = app.get_current_models();
+                    let new_selection = if current_models.is_empty() {
                         None
                     } else {
-                        Some(old_selection_index.unwrap_or(0).min(app.models.len().saturating_sub(1)))
+                        Some(old_selection_index.unwrap_or(0).min(current_models.len().saturating_sub(1)))
                     };
                     app.select_and_prepare_fetch(new_selection);
 
@@ -308,7 +365,6 @@ pub fn handle_app_event(event: AppEvent, app: &mut AppState) {
                     }
                 }
                 Err(e) => {
-                    // Keep existing error if pull/delete failed, otherwise show refresh error
                     if app.install_error.is_none() {
                         app.status_message = Some(format!("Error refreshing models: {}", e));
                     }
@@ -317,9 +373,7 @@ pub fn handle_app_event(event: AppEvent, app: &mut AppState) {
             app.current_mode = AppMode::Normal;
             app.install_status = None;
         }
-        // OllamaRunCompleted is handled separately in the main loop when mode is RunningOllama
         AppEvent::OllamaRunCompleted(_) => {
-             // This case should ideally not be reached here if the main loop logic is correct
              eprintln!("Warning: OllamaRunCompleted event received outside of RunningOllama mode.");
              app.current_mode = AppMode::Normal;
         }
@@ -343,6 +397,6 @@ pub fn handle_ollama_run_completion(
             app.status_message = Some(format!("'ollama run' failed: {}", e));
         }
     }
-    terminal.draw(|f| crate::ui::draw(f, app))?; // Force redraw
+    terminal.draw(|f| crate::ui::draw(f, app))?;
     Ok(false)
 }
