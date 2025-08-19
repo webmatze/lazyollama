@@ -76,6 +76,9 @@ async fn run_app(
                 app.selected_model_details = None;
                 app.is_fetching_details = false;
             }
+            // Initialize filtered_models to empty since no filter is active initially
+            app.filtered_models.clear();
+            app.is_filtered = false;
             app.status_message = None;
         }
         Err(e) => {
@@ -111,21 +114,18 @@ async fn run_app(
                 match event {
                     AppEvent::OllamaRunCompleted(result) => {
                         if handlers::handle_ollama_run_completion(result, app, terminal)? {
-                             break Ok(()); // Exit loop if handler signals channel closure
+                             break Ok(());
                         }
                     }
-                    // Ignore any other events that might arrive while RunningOllama was active
                     _ => {}
                 }
             } else {
-                // Channel closed, something went wrong.
                 app.status_message = Some("Error: Event channel closed unexpectedly.".to_string());
                 break Ok(());
             }
         } else {
             tokio::select! {
                 maybe_term_event_res = tokio::task::spawn_blocking(|| -> Result<Option<Event>> {
-                    // Poll with a timeout to keep the loop responsive
                     if crossterm::event::poll(Duration::from_millis(100)).map_err(AppError::Io)? {
                         let event = event::read().map_err(AppError::Io)?;
                         Ok(Some(event))
@@ -135,18 +135,16 @@ async fn run_app(
                 }) => {
                     match maybe_term_event_res {
                         Ok(Ok(Some(Event::Key(key)))) => {
-                            // The handler returns true if 'q' was pressed in Normal mode
                             if handlers::handle_key_event(key, app, &client, &tx).await? {
                                 app.should_quit = true;
                             }
                         }
-                         Ok(Ok(Some(_))) => {} // Other terminal event types (ignore for now)
-                        Ok(Ok(None)) => {} // Poll timeout, no input, continue loop
-                        Ok(Err(e)) => { // Error reading/polling crossterm event
+                         Ok(Ok(Some(_))) => {}
+                        Ok(Ok(None)) => {}
+                        Ok(Err(e)) => {
                             app.status_message = Some(format!("Input error: {}", e));
-                            // Potentially break or log error more formally
                         }
-                        Err(e) => { // Task panicked
+                        Err(e) => {
                            app.status_message = Some(format!("Input task panicked: {}", e));
                            break Ok(());
                         }
@@ -155,10 +153,8 @@ async fn run_app(
 
                 maybe_app_event = rx.recv() => {
                     if let Some(event) = maybe_app_event {
-                        // Excludes OllamaRunCompleted as it's handled in the RunningOllama mode block
                         handlers::handle_app_event(event, app);
                     } else {
-                        // Channel closed
                         app.status_message = Some("Error: Event channel closed unexpectedly.".to_string());
                         break Ok(());
                     }

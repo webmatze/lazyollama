@@ -4,8 +4,8 @@
 use crate::app::{AppMode, AppState};
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
-    style::{Color, Modifier, Style, Stylize}, // Added Stylize
-    text::{Line, Span, Text}, // Added Text
+    style::{Color, Modifier, Style, Stylize},
+    text::{Line, Span, Text},
     widgets::{Block, Borders, Clear, List, ListItem, Paragraph, Wrap},
     Frame,
 };
@@ -14,7 +14,7 @@ fn draw_help_modal(f: &mut Frame) {
     let block = Block::default()
         .title("Help - Shortcuts")
         .borders(Borders::ALL)
-        .style(Style::default().bg(Color::DarkGray)); // Use a background color
+        .style(Style::default().bg(Color::DarkGray));
 
     let help_text = vec![
         Line::from(Span::styled("--- General ---", Style::default().bold().underlined())),
@@ -27,6 +27,15 @@ fn draw_help_modal(f: &mut Frame) {
         Line::from("  d          : Delete Selected Model (Opens Confirm Dialog)"),
         Line::from("  i          : Install New Model (Opens Install Dialog)"),
         Line::from("  Enter      : Run Selected Model (Suspends TUI)"),
+        Line::from("  /          : Filter Models (Type to Search)"),
+        Line::from("  Ctrl+C     : Clear Filter"),
+        Line::from(""),
+        Line::from(Span::styled("--- Filter Mode ---", Style::default().bold().underlined())),
+        Line::from("  Type       : Enter Filter Text"),
+        Line::from("  Backspace  : Remove Character"),
+        Line::from("  Enter      : Confirm Filter"),
+        Line::from("  Esc        : Cancel Filter"),
+        Line::from("  Ctrl+C     : Clear Input"),
         Line::from(""),
         Line::from(Span::styled("--- Dialogs ---", Style::default().bold().underlined())),
         Line::from("  y / Y      : Confirm Action"),
@@ -34,20 +43,17 @@ fn draw_help_modal(f: &mut Frame) {
         Line::from(""),
         Line::from(Span::styled("--- Help Dialog ---", Style::default().bold().underlined())),
         Line::from("  h/?/q/Esc  : Close Help"),
-
     ];
 
     let paragraph = Paragraph::new(help_text)
         .block(block)
-        .wrap(Wrap { trim: false }); // Don't trim lines
+        .wrap(Wrap { trim: false });
 
-    // Adjust size as needed, maybe make it taller
-    let area = centered_rect(80, 70, f.size());
+    let area = centered_rect(80, 80, f.size());
 
-    f.render_widget(Clear, area); // Clear the area behind the modal
+    f.render_widget(Clear, area);
     f.render_widget(paragraph, area);
 }
-
 
 pub fn draw(f: &mut Frame, app: &AppState) {
     // Main layout: 90% for content, 10% for status bar
@@ -75,15 +81,27 @@ pub fn draw(f: &mut Frame, app: &AppState) {
         AppMode::InstallSelectModel => draw_install_model_select_dialog(f, app),
         AppMode::InstallSelectTag => draw_install_tag_select_dialog(f, app),
         AppMode::InstallConfirm => draw_install_confirm_dialog(f, app),
-        AppMode::Help => draw_help_modal(f), // Add call to draw help modal
-        _ => {} // No modal for Normal or Installing modes
+        AppMode::Help => draw_help_modal(f),
+        _ => {}
     }
     // --- End Render Modals ---
 }
 
 fn draw_model_list(f: &mut Frame, app: &AppState, area: Rect) {
-    let items: Vec<ListItem> = app
-        .models
+    // Split the model list area to include filter input if in filter mode
+    let (list_area, filter_area) = if app.current_mode == AppMode::Filter {
+        let split = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Length(3), Constraint::Min(0)].as_ref())
+            .split(area);
+        (split[1], Some(split[0]))
+    } else {
+        (area, None)
+    };
+
+    // Get the current models (filtered or full list)
+    let current_models = app.get_current_models();
+    let items: Vec<ListItem> = current_models
         .iter()
         .map(|m| {
             ListItem::new(Line::from(Span::styled(
@@ -93,8 +111,15 @@ fn draw_model_list(f: &mut Frame, app: &AppState, area: Rect) {
         })
         .collect();
 
+    // Create title with filter indicator
+    let title = if app.is_filtered {
+        format!("Models (filtered: {}/{})", current_models.len(), app.models.len())
+    } else {
+        "Models".to_string()
+    };
+
     let list = List::new(items)
-        .block(Block::default().borders(Borders::ALL).title("Models"))
+        .block(Block::default().borders(Borders::ALL).title(title))
         .highlight_style(
             Style::default()
                 .bg(Color::LightBlue)
@@ -102,9 +127,39 @@ fn draw_model_list(f: &mut Frame, app: &AppState, area: Rect) {
         )
         .highlight_symbol("> ");
 
-    // Temporary workaround: Pass a mutable clone of list_state
     let mut list_state = app.list_state.clone();
-    f.render_stateful_widget(list, area, &mut list_state);
+    f.render_stateful_widget(list, list_area, &mut list_state);
+
+    // Draw filter input if in filter mode
+    if let Some(filter_area) = filter_area {
+        draw_filter_input(f, app, filter_area);
+    }
+}
+
+fn draw_filter_input(f: &mut Frame, app: &AppState, area: Rect) {
+    let input_style = if app.current_mode == AppMode::Filter {
+        Style::default().fg(Color::Yellow)
+    } else {
+        Style::default()
+    };
+
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .title("Filter")
+        .border_style(input_style);
+
+    // Create the input display with cursor
+    let mut input_display = app.filter_input.clone();
+    if app.current_mode == AppMode::Filter {
+        // Insert cursor character at cursor position
+        input_display.insert(app.filter_cursor_pos, '█');
+    }
+
+    let input_paragraph = Paragraph::new(input_display)
+        .block(block)
+        .style(input_style);
+
+    f.render_widget(input_paragraph, area);
 }
 
 fn draw_model_details(f: &mut Frame, app: &AppState, area: Rect) {
@@ -113,7 +168,8 @@ fn draw_model_details(f: &mut Frame, app: &AppState, area: Rect) {
     let mut text_lines: Vec<Line> = Vec::new();
 
     if let Some(selected_index) = app.list_state.selected() {
-        if let Some(basic_info) = app.models.get(selected_index) {
+        let current_models = app.get_current_models();
+        if let Some(basic_info) = current_models.get(selected_index) {
             // Display basic info first
             text_lines.push(Line::from(vec![
                 Span::styled("Name: ", Style::default().bold()),
@@ -123,43 +179,64 @@ fn draw_model_details(f: &mut Frame, app: &AppState, area: Rect) {
                 Span::styled("Size: ", Style::default().bold()),
                 Span::raw(basic_info.size_formatted()),
             ]));
-             text_lines.push(Line::from(vec![
+            text_lines.push(Line::from(vec![
                 Span::styled("Modified: ", Style::default().bold()),
-                Span::raw(basic_info.modified_at.clone()), // Consider formatting
+                Span::raw(basic_info.modified_at.clone()),
             ]));
-             text_lines.push(Line::from(vec![
+            text_lines.push(Line::from(vec![
                 Span::styled("Digest: ", Style::default().bold()),
                 Span::raw(basic_info.digest.chars().take(12).collect::<String>() + "..."),
             ]));
-            text_lines.push(Line::from("")); // Spacer
+            text_lines.push(Line::from(""));
 
             // Check if detailed info is available
             if let Some(details) = &app.selected_model_details {
-                 text_lines.push(Line::from(Span::styled("--- Details ---", Style::default().italic())));
+                text_lines.push(Line::from(Span::styled("--- Details ---", Style::default().italic())));
 
-                 if let Some(extra) = &details.details {
-                    if let Some(val) = &extra.family { text_lines.push(Line::from(vec![Span::styled("Family: ", Style::default().bold()), Span::raw(val)])); }
-                    if let Some(val) = &extra.format { text_lines.push(Line::from(vec![Span::styled("Format: ", Style::default().bold()), Span::raw(val)])); }
-                    if let Some(val) = &extra.parameter_size { text_lines.push(Line::from(vec![Span::styled("Param Size: ", Style::default().bold()), Span::raw(val)])); }
-                    if let Some(val) = &extra.quantization_level { text_lines.push(Line::from(vec![Span::styled("Quant Level: ", Style::default().bold()), Span::raw(val)])); }
+                if let Some(extra) = &details.details {
+                    if let Some(val) = &extra.family { 
+                        text_lines.push(Line::from(vec![Span::styled("Family: ", Style::default().bold()), Span::raw(val)])); 
+                    }
+                    if let Some(val) = &extra.format { 
+                        text_lines.push(Line::from(vec![Span::styled("Format: ", Style::default().bold()), Span::raw(val)])); 
+                    }
+                    if let Some(val) = &extra.parameter_size { 
+                        text_lines.push(Line::from(vec![Span::styled("Param Size: ", Style::default().bold()), Span::raw(val)])); 
+                    }
+                    if let Some(val) = &extra.quantization_level { 
+                        text_lines.push(Line::from(vec![Span::styled("Quant Level: ", Style::default().bold()), Span::raw(val)])); 
+                    }
                     if let Some(families) = &extra.families {
                         if !families.is_empty() {
-                             text_lines.push(Line::from(vec![Span::styled("Families: ", Style::default().bold()), Span::raw(families.join(", "))]));
+                            text_lines.push(Line::from(vec![Span::styled("Families: ", Style::default().bold()), Span::raw(families.join(", "))]));
                         }
                     }
-                    // Add more fields from ModelExtraDetails if needed
-                 }
+                }
 
-                 if let Some(val) = &details.parameters { text_lines.push(Line::from("")); text_lines.push(Line::from(Span::styled("Parameters:", Style::default().bold()))); text_lines.push(Line::from(Span::raw(val.clone()))); }
-                 if let Some(val) = &details.template { text_lines.push(Line::from("")); text_lines.push(Line::from(Span::styled("Template:", Style::default().bold()))); text_lines.push(Line::from(Span::raw(val.clone()))); }
-                 if let Some(val) = &details.modelfile { text_lines.push(Line::from("")); text_lines.push(Line::from(Span::styled("Modelfile:", Style::default().bold()))); text_lines.push(Line::from(Span::raw(val.clone()))); }
-                 if let Some(val) = &details.license { text_lines.push(Line::from("")); text_lines.push(Line::from(Span::styled("License:", Style::default().bold()))); text_lines.push(Line::from(Span::raw(val.clone()))); }
-
+                if let Some(val) = &details.parameters { 
+                    text_lines.push(Line::from("")); 
+                    text_lines.push(Line::from(Span::styled("Parameters:", Style::default().bold()))); 
+                    text_lines.push(Line::from(Span::raw(val.clone()))); 
+                }
+                if let Some(val) = &details.template { 
+                    text_lines.push(Line::from("")); 
+                    text_lines.push(Line::from(Span::styled("Template:", Style::default().bold()))); 
+                    text_lines.push(Line::from(Span::raw(val.clone()))); 
+                }
+                if let Some(val) = &details.modelfile { 
+                    text_lines.push(Line::from("")); 
+                    text_lines.push(Line::from(Span::styled("Modelfile:", Style::default().bold()))); 
+                    text_lines.push(Line::from(Span::raw(val.clone()))); 
+                }
+                if let Some(val) = &details.license { 
+                    text_lines.push(Line::from("")); 
+                    text_lines.push(Line::from(Span::styled("License:", Style::default().bold()))); 
+                    text_lines.push(Line::from(Span::raw(val.clone()))); 
+                }
             } else {
-                // Details not yet loaded
                 if let Some(status) = &app.status_message {
-                    if status.contains("Fetching") { // Check if fetching is in progress
-                         text_lines.push(Line::from(Span::styled("Fetching details...", Style::default().italic())));
+                    if status.contains("Fetching") {
+                        text_lines.push(Line::from(Span::styled("Fetching details...", Style::default().italic())));
                     }
                 }
             }
@@ -170,46 +247,50 @@ fn draw_model_details(f: &mut Frame, app: &AppState, area: Rect) {
         text_lines.push(Line::from("Select a model to see details."));
     }
 
-    let paragraph = Paragraph::new(Text::from(text_lines)) // Use Text::from(Vec<Line>)
+    let paragraph = Paragraph::new(Text::from(text_lines))
         .block(block)
-        .wrap(Wrap { trim: false }); // Allow scrolling for long content
+        .wrap(Wrap { trim: false });
 
     f.render_widget(paragraph, area);
 }
 
 fn draw_status_bar(f: &mut Frame, app: &AppState, area: Rect) {
-    // Determine status text based on mode, errors, and status messages
     let status_text = if let Some(err) = &app.install_error {
-        // Prioritize showing errors
-        format!("Error: {}", err).red().to_string() // Assuming Stylize trait is used
+        format!("Error: {}", err).red().to_string()
     } else if let Some(status) = &app.install_status {
-         // Show installation status if present
         status.clone().yellow().to_string()
     } else {
-         // Otherwise, show mode-specific help or general status
         match app.current_mode {
-            AppMode::Normal => app.status_message.clone().unwrap_or_else(||
-                "q: Quit | ↓/j: Down | ↑/k: Up | d: Delete | i: Install | Enter: Run Model".to_string()
-            ),
+            AppMode::Normal => {
+                if app.is_filtered {
+                    format!("Filter: '{}' ({} models) | /: Filter | Ctrl+C: Clear | q: Quit", 
+                            app.filter_input, app.get_current_models().len())
+                } else {
+                    app.status_message.clone().unwrap_or_else(||
+                        "q: Quit | ↓/j: Down | ↑/k: Up | d: Delete | i: Install | Enter: Run | /: Filter".to_string()
+                    )
+                }
+            }
+            AppMode::Filter => {
+                format!("Filter Mode: Type to search | Enter: Confirm | Esc: Cancel | Ctrl+C: Clear")
+            }
             AppMode::ConfirmDelete => "Confirm delete? (y/N)".to_string(),
             AppMode::InstallSelectModel => "↑/↓: Select | Enter: Choose Tags | Esc: Cancel".to_string(),
             AppMode::InstallSelectTag => "↑/↓: Select | Enter: Confirm | Esc: Back".to_string(),
             AppMode::InstallConfirm => "Confirm install? (y/N) | Esc: Back".to_string(),
-            AppMode::Installing => app.install_status.clone().unwrap_or_else(|| "Installing...".to_string()), // Should be covered by install_status check above, but as fallback
+            AppMode::Installing => app.install_status.clone().unwrap_or_else(|| "Installing...".to_string()),
             AppMode::RunningOllama => "Running ollama... (TUI Suspended)".to_string(),
-            AppMode::Help => "h/?/q/Esc: Close Help".to_string(), // Add status for Help mode
+            AppMode::Help => "h/?/q/Esc: Close Help".to_string(),
         }
     };
 
-    // Convert String to Line for Paragraph
     let status_line = Line::from(status_text);
 
-    let paragraph = Paragraph::new(status_line) // Use the determined status_line
+    let paragraph = Paragraph::new(status_line)
         .style(Style::default().bg(Color::DarkGray));
 
     f.render_widget(paragraph, area);
 }
-
 
 fn draw_confirmation_dialog(f: &mut Frame, model_name: &str) {
     let block = Block::default()
@@ -228,16 +309,15 @@ fn draw_confirmation_dialog(f: &mut Frame, model_name: &str) {
     f.render_widget(paragraph, area);
 }
 
-
 fn draw_install_model_select_dialog(f: &mut Frame, app: &AppState) {
     let block = Block::default()
         .title("Install Model: Select Model")
         .borders(Borders::ALL)
         .style(Style::default().bg(Color::DarkGray));
 
-    let area = centered_rect(70, 50, f.size()); // Adjust size as needed
+    let area = centered_rect(70, 50, f.size());
 
-    f.render_widget(Clear, area); // Clear the area
+    f.render_widget(Clear, area);
 
     if app.is_fetching_registry {
         let loading_text = Paragraph::new("Loading models...")
@@ -273,9 +353,9 @@ fn draw_install_tag_select_dialog(f: &mut Frame, app: &AppState) {
         .borders(Borders::ALL)
         .style(Style::default().bg(Color::DarkGray));
 
-    let area = centered_rect(60, 50, f.size()); // Adjust size as needed
+    let area = centered_rect(60, 50, f.size());
 
-    f.render_widget(Clear, area); // Clear the area
+    f.render_widget(Clear, area);
 
     if app.is_fetching_registry {
         let loading_text = Paragraph::new("Loading tags...")
@@ -322,7 +402,6 @@ fn draw_install_confirm_dialog(f: &mut Frame, app: &AppState) {
     f.render_widget(Clear, area);
     f.render_widget(paragraph, area);
 }
-
 
 /// Helper function to create a centered rectangle.
 fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
