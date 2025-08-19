@@ -58,7 +58,7 @@ pub async fn fetch_registry_tags(model_name: &str) -> Result<Vec<String>> { // U
         .map_err(|e| AppError::Api(ApiError::Reqwest(e)))?; // Add missing semicolon
 
     let document = Html::parse_document(&html_content);
-    let tag_selector = Selector::parse("body > main > div > section > ul > li a") // Updated selector to target anchor tags directly
+    let tag_selector = Selector::parse("body section a div div span:first-child") // Updated selector to target anchor tags directly
         .map_err(|e| AppError::Scraping(format!("Failed to parse tag selector: {}", e)))?;
 
     let mut tags = Vec::new();
