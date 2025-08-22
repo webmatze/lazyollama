@@ -7,9 +7,10 @@ use ratatui::widgets::ListState;
 #[derive(Debug, PartialEq, Clone)]
 pub enum AppMode {
     Normal,
-    Filter, // New: Filter input mode
+    Filter,
     ConfirmDelete,
     InstallSelectModel,
+    InstallSelectModelFilter,
     InstallSelectTag,
     InstallConfirm,
     Installing,
@@ -29,12 +30,13 @@ pub struct AppState {
     pub is_fetching_details: bool,
 
     // Filter-related fields
-    pub filter_input: String,      // New: Current filter input
-    pub is_filtered: bool,         // New: Whether filter is active
-    pub filter_cursor_pos: usize,  // New: Cursor position in filter input
+    pub filter_input: String,
+    pub is_filtered: bool,
+    pub filter_cursor_pos: usize,
 
     // Registry-related fields
     pub registry_models: Vec<String>,
+    pub filtered_registry_models: Vec<String>,
     pub registry_tags: Vec<String>,
     pub registry_model_list_state: ListState,
     pub registry_tag_list_state: ListState,
@@ -44,13 +46,18 @@ pub struct AppState {
     pub install_error: Option<String>,
     pub install_status: Option<String>,
     pub previous_mode: Option<AppMode>,
+    
+    // Registry filter fields
+    pub registry_filter_input: String,
+    pub is_registry_filtered: bool,
+    pub registry_filter_cursor_pos: usize,
 }
 
 impl AppState {
     pub fn new() -> Self {
         Self {
             models: Vec::new(),
-            filtered_models: Vec::new(), // Initialize filtered models
+            filtered_models: Vec::new(),
             list_state: ListState::default(),
             selected_model_details: None,
             status_message: Some("Loading models...".to_string()),
@@ -66,6 +73,7 @@ impl AppState {
 
             // Registry fields
             registry_models: Vec::new(),
+            filtered_registry_models: Vec::new(),
             registry_tags: Vec::new(),
             registry_model_list_state: ListState::default(),
             registry_tag_list_state: ListState::default(),
@@ -75,6 +83,11 @@ impl AppState {
             install_error: None,
             install_status: None,
             previous_mode: None,
+            
+            // Registry filter fields
+            registry_filter_input: String::new(),
+            is_registry_filtered: false,
+            registry_filter_cursor_pos: 0,
         }
     }
 
@@ -211,5 +224,75 @@ impl AppState {
             .selected()
             .and_then(|i| current_models.get(i))
             .map(|m| m.name.clone())
+    }
+
+    // Registry filter methods
+    pub fn get_current_registry_models(&self) -> &[String] {
+        if self.is_registry_filtered {
+            &self.filtered_registry_models
+        } else {
+            &self.registry_models
+        }
+    }
+
+    pub fn apply_registry_filter(&mut self) {
+        if self.registry_filter_input.is_empty() {
+            self.filtered_registry_models.clear();
+            self.is_registry_filtered = false;
+        } else {
+            let filter_lower = self.registry_filter_input.to_lowercase();
+            self.filtered_registry_models = self.registry_models
+                .iter()
+                .filter(|model| model.to_lowercase().contains(&filter_lower))
+                .cloned()
+                .collect();
+            self.is_registry_filtered = true;
+        }
+
+        let current_models = self.get_current_registry_models();
+        if current_models.is_empty() {
+            self.registry_model_list_state.select(None);
+        } else {
+            self.registry_model_list_state.select(Some(0));
+        }
+    }
+
+    pub fn clear_registry_filter(&mut self) {
+        self.registry_filter_input.clear();
+        self.registry_filter_cursor_pos = 0;
+        self.is_registry_filtered = false;
+        self.filtered_registry_models.clear();
+        
+        if self.registry_models.is_empty() {
+            self.registry_model_list_state.select(None);
+        } else {
+            self.registry_model_list_state.select(Some(0));
+        }
+    }
+
+    pub fn registry_filter_input_char(&mut self, c: char) {
+        self.registry_filter_input.insert(self.registry_filter_cursor_pos, c);
+        self.registry_filter_cursor_pos += 1;
+        self.apply_registry_filter();
+    }
+
+    pub fn registry_filter_input_backspace(&mut self) {
+        if self.registry_filter_cursor_pos > 0 {
+            self.registry_filter_cursor_pos -= 1;
+            self.registry_filter_input.remove(self.registry_filter_cursor_pos);
+            self.apply_registry_filter();
+        }
+    }
+
+    pub fn registry_filter_cursor_left(&mut self) {
+        if self.registry_filter_cursor_pos > 0 {
+            self.registry_filter_cursor_pos -= 1;
+        }
+    }
+
+    pub fn registry_filter_cursor_right(&mut self) {
+        if self.registry_filter_cursor_pos < self.registry_filter_input.len() {
+            self.registry_filter_cursor_pos += 1;
+        }
     }
 }

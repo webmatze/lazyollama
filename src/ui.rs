@@ -37,6 +37,13 @@ fn draw_help_modal(f: &mut Frame) {
         Line::from("  Esc        : Cancel Filter"),
         Line::from("  Ctrl+C     : Clear Input"),
         Line::from(""),
+        Line::from(Span::styled("--- Install Mode ---", Style::default().bold().underlined())),
+        Line::from("  ↓ / ↑ / j / k: Navigate Models/Tags"),
+        Line::from("  /          : Filter Registry Models"),
+        Line::from("  Ctrl+C     : Clear Registry Filter"),
+        Line::from("  Enter      : Select Model/Tag"),
+        Line::from("  Esc / q    : Cancel / Go Back"),
+        Line::from(""),
         Line::from(Span::styled("--- Dialogs ---", Style::default().bold().underlined())),
         Line::from("  y / Y      : Confirm Action"),
         Line::from("  n / N / Esc: Cancel / Go Back"),
@@ -79,6 +86,7 @@ pub fn draw(f: &mut Frame, app: &AppState) {
             }
         }
         AppMode::InstallSelectModel => draw_install_model_select_dialog(f, app),
+        AppMode::InstallSelectModelFilter => draw_install_model_select_dialog(f, app),
         AppMode::InstallSelectTag => draw_install_tag_select_dialog(f, app),
         AppMode::InstallConfirm => draw_install_confirm_dialog(f, app),
         AppMode::Help => draw_help_modal(f),
@@ -275,7 +283,15 @@ fn draw_status_bar(f: &mut Frame, app: &AppState, area: Rect) {
                 format!("Filter Mode: Type to search | Enter: Confirm | Esc: Cancel | Ctrl+C: Clear")
             }
             AppMode::ConfirmDelete => "Confirm delete? (y/N)".to_string(),
-            AppMode::InstallSelectModel => "↑/↓: Select | Enter: Choose Tags | Esc: Cancel".to_string(),
+            AppMode::InstallSelectModel => {
+                if app.is_registry_filtered {
+                    format!("Filter: '{}' ({} models) | /: Filter | Ctrl+C: Clear | ↑/↓: Select | Enter: Choose Tags | Esc: Cancel", 
+                            app.registry_filter_input, app.get_current_registry_models().len())
+                } else {
+                    "↑/↓: Select | Enter: Choose Tags | /: Filter | Esc: Cancel".to_string()
+                }
+            },
+            AppMode::InstallSelectModelFilter => "Filter Mode: Type to search | Enter: Confirm | Esc: Cancel | Ctrl+C: Clear".to_string(),
             AppMode::InstallSelectTag => "↑/↓: Select | Enter: Confirm | Esc: Back".to_string(),
             AppMode::InstallConfirm => "Confirm install? (y/N) | Esc: Back".to_string(),
             AppMode::Installing => app.install_status.clone().unwrap_or_else(|| "Installing...".to_string()),
@@ -310,23 +326,43 @@ fn draw_confirmation_dialog(f: &mut Frame, model_name: &str) {
 }
 
 fn draw_install_model_select_dialog(f: &mut Frame, app: &AppState) {
+    // Split the dialog area to include filter input if in filter mode
+    let (list_area, filter_area) = if app.current_mode == AppMode::InstallSelectModelFilter {
+        let split = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Length(3), Constraint::Min(0)].as_ref())
+            .split(centered_rect(70, 50, f.size()));
+        (split[1], Some(split[0]))
+    } else {
+        (centered_rect(70, 50, f.size()), None)
+    };
+
+    // Create title with filter indicator
+    let title = if app.is_registry_filtered {
+        format!("Install Model: Select Model (filtered: {}/{})", 
+                app.get_current_registry_models().len(), app.registry_models.len())
+    } else {
+        "Install Model: Select Model".to_string()
+    };
+
     let block = Block::default()
-        .title("Install Model: Select Model")
+        .title(title)
         .borders(Borders::ALL)
         .style(Style::default().bg(Color::DarkGray));
 
-    let area = centered_rect(70, 50, f.size());
-
-    f.render_widget(Clear, area);
+    f.render_widget(Clear, list_area);
+    if let Some(filter_area) = filter_area {
+        f.render_widget(Clear, filter_area);
+    }
 
     if app.is_fetching_registry {
         let loading_text = Paragraph::new("Loading models...")
             .block(block)
             .alignment(ratatui::layout::Alignment::Center);
-        f.render_widget(loading_text, area);
+        f.render_widget(loading_text, list_area);
     } else {
-        let items: Vec<ListItem> = app
-            .registry_models
+        let current_models = app.get_current_registry_models();
+        let items: Vec<ListItem> = current_models
             .iter()
             .map(|m| ListItem::new(Line::from(m.clone())))
             .collect();
@@ -341,8 +377,40 @@ fn draw_install_model_select_dialog(f: &mut Frame, app: &AppState) {
             .highlight_symbol("> ");
 
         let mut list_state = app.registry_model_list_state.clone();
-        f.render_stateful_widget(list, area, &mut list_state);
+        f.render_stateful_widget(list, list_area, &mut list_state);
     }
+
+    // Draw filter input if in filter mode
+    if let Some(filter_area) = filter_area {
+        draw_registry_filter_input(f, app, filter_area);
+    }
+}
+
+fn draw_registry_filter_input(f: &mut Frame, app: &AppState, area: Rect) {
+    let input_style = if app.current_mode == AppMode::InstallSelectModelFilter {
+        Style::default().fg(Color::Yellow)
+    } else {
+        Style::default()
+    };
+
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .title("Filter Registry Models")
+        .border_style(input_style)
+        .style(Style::default().bg(Color::DarkGray));
+
+    // Create the input display with cursor
+    let mut input_display = app.registry_filter_input.clone();
+    if app.current_mode == AppMode::InstallSelectModelFilter {
+        // Insert cursor character at cursor position
+        input_display.insert(app.registry_filter_cursor_pos, '█');
+    }
+
+    let input_paragraph = Paragraph::new(input_display)
+        .block(block)
+        .style(input_style);
+
+    f.render_widget(input_paragraph, area);
 }
 
 fn draw_install_tag_select_dialog(f: &mut Frame, app: &AppState) {
