@@ -11,6 +11,23 @@ use tokio::sync::mpsc;
 
 type EventSender = mpsc::Sender<AppEvent>;
 
+/// Handles Ctrl+C clear functionality for filter modes
+fn handle_filter_clear(app: &mut AppState) {
+    match app.current_mode {
+        AppMode::Filter => {
+            app.filter_input.clear();
+            app.filter_cursor_pos = 0;
+            app.apply_filter();
+        }
+        AppMode::InstallSelectModelFilter => {
+            app.registry_filter_input.clear();
+            app.registry_filter_cursor_pos = 0;
+            app.apply_registry_filter();
+        }
+        _ => {} // Should not happen, but handle gracefully
+    }
+}
+
 /// Handles terminal key events.
 /// Returns `Ok(true)` if the application should quit, `Ok(false)` otherwise.
 pub async fn handle_key_event(
@@ -89,9 +106,7 @@ pub async fn handle_key_event(
                 AppMode::Filter => match key.code {
                     KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => {
                         // Clear filter input with Ctrl+C
-                        app.filter_input.clear();
-                        app.filter_cursor_pos = 0;
-                        app.apply_filter();
+                        handle_filter_clear(app);
                     }
                     KeyCode::Char(c) => {
                         // Add character to filter input
@@ -277,9 +292,7 @@ pub async fn handle_key_event(
                 AppMode::InstallSelectModelFilter => match key.code {
                     KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => {
                         // Clear filter input with Ctrl+C
-                        app.registry_filter_input.clear();
-                        app.registry_filter_cursor_pos = 0;
-                        app.apply_registry_filter();
+                        handle_filter_clear(app);
                     }
                     KeyCode::Char(c) => {
                         // Add character to registry filter input
