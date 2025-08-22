@@ -164,7 +164,8 @@ fn draw_filter_input(f: &mut Frame, app: &AppState, area: Rect) {
     let mut input_display = app.filter_input.clone();
     if app.current_mode == AppMode::Filter {
         // Insert cursor character at cursor position (using ASCII-safe cursor)
-        input_display.insert(app.filter_cursor_pos, CURSOR_CHAR);
+        let cursor_pos = std::cmp::min(app.filter_cursor_pos, input_display.len());
+        input_display.insert(cursor_pos, CURSOR_CHAR);
     }
 
     let input_paragraph = Paragraph::new(input_display)
@@ -407,7 +408,8 @@ fn draw_registry_filter_input(f: &mut Frame, app: &AppState, area: Rect) {
     let mut input_display = app.registry_filter_input.clone();
     if app.current_mode == AppMode::InstallSelectModelFilter {
         // Insert cursor character at cursor position (using ASCII-safe cursor)
-        input_display.insert(app.registry_filter_cursor_pos, CURSOR_CHAR);
+        let cursor_pos = std::cmp::min(app.registry_filter_cursor_pos, input_display.len());
+        input_display.insert(cursor_pos, CURSOR_CHAR);
     }
 
     let input_paragraph = Paragraph::new(input_display)
