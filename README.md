@@ -8,10 +8,12 @@ https://github.com/user-attachments/assets/5fcdb0eb-c398-4662-aed9-4fd8359d7063
 ## Features
 
 *   **List Models:** Displays a scrollable list of locally installed Ollama models.
+*   **Search & Filter Models:** Real-time search and filtering of installed models using `/` key.
 *   **Run Models:** Run any of the locally installed Ollama models.
 *   **Inspect Models:** Shows detailed information for the selected model (size, modification date, digest, family, parameters, etc.).
 *   **Delete Models:** Allows deleting the selected model with a confirmation prompt.
-*   **Install Models:** Allows to pull new models from the ollama registry.
+*   **Install Models:** Allows to pull new models from the ollama registry with search and filter capabilities.
+*   **Registry Search:** Search and filter through available models in the Ollama registry during installation.
 *   **Environment Variable:** Uses `OLLAMA_HOST` environment variable for the Ollama API endpoint (defaults to `http://localhost:11434`).
 
 ## Installation
@@ -142,14 +144,66 @@ If the command isn't found, ensure the installation location is in your PATH.
 
 ## Keybindings
 
+### General
 *   `q`: Quit the application.
+*   `h` / `?`: Show/Hide help screen.
+
+### Model List Navigation
 *   `↓` / `j`: Move selection down.
 *   `↑` / `k`: Move selection up.
+*   `Enter`: Run selected model in ollama.
 *   `d`: Initiate deletion of the selected model (shows confirmation).
-*   `y` / `Y`: Confirm deletion (when in confirmation mode).
-*   `n` / `N` / `Esc`: Cancel deletion (when in confirmation mode).
-*   `i`: Install/Pull new models
-*   `Enter`: Run selected model in ollama
+
+### Search & Filter (Local Models)
+*   `/`: Enter filter mode to search through installed models.
+*   `Ctrl+C`: Clear current filter.
+
+### Filter Mode Controls
+*   `Type`: Enter search text to filter models in real-time.
+*   `Backspace`: Remove characters from search.
+*   `←` / `→`: Move cursor within search input.
+*   `Enter`: Confirm filter and return to model list.
+*   `Esc`: Cancel filter and clear search.
+
+### Model Installation
+*   `i`: Open install dialog to browse and install new models from registry.
+*   `/`: (During install) Filter available registry models.
+*   `Ctrl+C`: (During install) Clear registry filter.
+
+### Confirmation Dialogs
+*   `y` / `Y`: Confirm action (delete, install, etc.).
+*   `n` / `N` / `Esc`: Cancel action or go back.
+
+## Search & Filter Features
+
+### Local Model Filtering
+LazyOllama provides powerful search capabilities for your installed models:
+
+1. **Quick Search**: Press `/` from the main model list to enter filter mode
+2. **Real-time Filtering**: Type to instantly filter models as you type
+3. **Case-insensitive**: Search works regardless of capitalization
+4. **Partial Matching**: Find models by typing any part of their name
+5. **Visual Feedback**: See filtered count in the title bar (e.g., "Models (filtered: 3/10)")
+
+**Example**: Type "llama" to show only models containing "llama" in their name.
+
+### Registry Model Search
+When installing new models (`i` key), you can also search through available models:
+
+1. **Browse Registry**: Press `i` to see all available models from Ollama registry
+2. **Filter Registry**: Press `/` within the install dialog to filter available models  
+3. **Find Models Fast**: Quickly locate specific models from hundreds of available options
+4. **Smart Filtering**: Same real-time, case-insensitive search as local models
+
+**Example**: In install mode, type "code" to find all code-related models like "codellama", "codegemma", etc.
+
+### Filter Controls
+Both local and registry filters support the same intuitive controls:
+- **Arrow keys** or **mouse**: Position cursor anywhere in search text
+- **Backspace**: Delete characters before cursor
+- **Ctrl+C**: Instantly clear current filter
+- **Enter**: Apply filter and return to browsing
+- **Esc**: Cancel and clear filter
 
 ## Dependencies
 
