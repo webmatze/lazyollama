@@ -11,6 +11,23 @@ use tokio::sync::mpsc;
 
 type EventSender = mpsc::Sender<AppEvent>;
 
+/// Handles Ctrl+C clear functionality for filter modes
+fn handle_filter_clear(app: &mut AppState) {
+    match app.current_mode {
+        AppMode::Filter => {
+            app.filter_input.clear();
+            app.filter_cursor_pos = 0;
+            app.apply_filter();
+        }
+        AppMode::InstallSelectModelFilter => {
+            app.registry_filter_input.clear();
+            app.registry_filter_cursor_pos = 0;
+            app.apply_registry_filter();
+        }
+        _ => {} // Should not happen, but handle gracefully
+    }
+}
+
 /// Handles terminal key events.
 /// Returns `Ok(true)` if the application should quit, `Ok(false)` otherwise.
 pub async fn handle_key_event(
@@ -21,7 +38,7 @@ pub async fn handle_key_event(
 ) -> Result<bool> {
     if key.kind == KeyEventKind::Press || key.kind == KeyEventKind::Repeat {
         let mut handled_globally = false;
-        if app.current_mode != AppMode::RunningOllama && app.current_mode != AppMode::Help && app.current_mode != AppMode::Filter {
+        if app.is_global_key_handling_enabled() {
             match key.code {
                 KeyCode::Char('h') | KeyCode::Char('?') => {
                     app.previous_mode = Some(app.current_mode.clone());
@@ -87,6 +104,10 @@ pub async fn handle_key_event(
                     _ => {}
                 },
                 AppMode::Filter => match key.code {
+                    KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                        // Clear filter input with Ctrl+C
+                        handle_filter_clear(app);
+                    }
                     KeyCode::Char(c) => {
                         // Add character to filter input
                         app.filter_input_char(c);
@@ -116,12 +137,6 @@ pub async fn handle_key_event(
                         app.current_mode = AppMode::Normal;
                         app.status_message = Some("Filter cleared".to_string());
                     }
-                    KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                        // Clear filter input with Ctrl+C
-                        app.filter_input.clear();
-                        app.filter_cursor_pos = 0;
-                        app.apply_filter();
-                    }
                     _ => {}
                 },
                 AppMode::ConfirmDelete => match key.code {
@@ -146,8 +161,21 @@ pub async fn handle_key_event(
                     _ => {}
                 },
                 AppMode::InstallSelectModel => match key.code {
+                    KeyCode::Char('/') => {
+                        // Enter registry filter mode
+                        app.current_mode = AppMode::InstallSelectModelFilter;
+                        app.registry_filter_input.clear();
+                        app.registry_filter_cursor_pos = 0;
+                        app.install_error = None;
+                    }
+                    KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                        // Clear registry filter with Ctrl+C
+                        if app.is_registry_filtered {
+                            app.clear_registry_filter();
+                        }
+                    }
                     KeyCode::Char('j') | KeyCode::Down => {
-                        let len = app.registry_models.len();
+                        let len = app.get_current_registry_models().len();
                         if len > 0 {
                             let i = match app.registry_model_list_state.selected() {
                                 Some(i) => (i + 1) % len,
@@ -157,7 +185,7 @@ pub async fn handle_key_event(
                         }
                     }
                     KeyCode::Char('k') | KeyCode::Up => {
-                        let len = app.registry_models.len();
+                        let len = app.get_current_registry_models().len();
                         if len > 0 {
                             let i = match app.registry_model_list_state.selected() {
                                 Some(i) => (i + len - 1) % len,
@@ -168,7 +196,7 @@ pub async fn handle_key_event(
                     }
                     KeyCode::Enter => {
                         if let Some(selected_index) = app.registry_model_list_state.selected() {
-                            if let Some(model_name) = app.registry_models.get(selected_index).cloned() {
+                            if let Some(model_name) = app.get_current_registry_models().get(selected_index).cloned() {
                                 app.selected_registry_model = Some(model_name.clone());
                                 app.current_mode = AppMode::InstallSelectTag;
                                 app.is_fetching_registry = true;
@@ -188,6 +216,7 @@ pub async fn handle_key_event(
                         app.current_mode = AppMode::Normal;
                         app.install_error = None;
                         app.is_fetching_registry = false;
+                        app.clear_registry_filter();
                     }
                     _ => {}
                 },
@@ -260,6 +289,42 @@ pub async fn handle_key_event(
                     // Input is ignored while installing.
                 }
                 AppMode::RunningOllama => unreachable!(),
+                AppMode::InstallSelectModelFilter => match key.code {
+                    KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                        // Clear filter input with Ctrl+C
+                        handle_filter_clear(app);
+                    }
+                    KeyCode::Char(c) => {
+                        // Add character to registry filter input
+                        app.registry_filter_input_char(c);
+                    }
+                    KeyCode::Backspace => {
+                        // Remove character from registry filter input
+                        app.registry_filter_input_backspace();
+                    }
+                    KeyCode::Left => {
+                        app.registry_filter_cursor_left();
+                    }
+                    KeyCode::Right => {
+                        app.registry_filter_cursor_right();
+                    }
+                    KeyCode::Enter => {
+                        // Confirm filter and return to install select mode
+                        app.current_mode = AppMode::InstallSelectModel;
+                        app.install_error = if app.is_registry_filtered {
+                            Some(format!("Filter: '{}' ({} models)", app.registry_filter_input, app.get_current_registry_models().len()))
+                        } else {
+                            None
+                        };
+                    }
+                    KeyCode::Esc => {
+                        // Cancel filter - clear it and return to install select mode
+                        app.clear_registry_filter();
+                        app.current_mode = AppMode::InstallSelectModel;
+                        app.install_error = Some("Filter cleared".to_string());
+                    }
+                    _ => {}
+                },
                 AppMode::Help => match key.code {
                     KeyCode::Char('h') | KeyCode::Char('?') | KeyCode::Char('q') | KeyCode::Esc => {
                         app.current_mode = app.previous_mode.take().unwrap_or(AppMode::Normal);
@@ -294,7 +359,10 @@ pub fn handle_app_event(event: AppEvent, app: &mut AppState) {
             match result {
                 Ok(models) => {
                     app.registry_models = models;
-                    if !app.registry_models.is_empty() {
+                    // Reapply filter if it was active
+                    if app.is_registry_filtered {
+                        app.apply_registry_filter();
+                    } else if !app.registry_models.is_empty() {
                         app.registry_model_list_state.select(Some(0));
                     } else {
                         app.registry_model_list_state.select(None);
