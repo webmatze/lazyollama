@@ -295,4 +295,15 @@ impl AppState {
             self.registry_filter_cursor_pos += 1;
         }
     }
+
+    /// Returns true if global key handling (like help) should be enabled.
+    /// Global keys are disabled in modes that handle their own input.
+    pub fn is_global_key_handling_enabled(&self) -> bool {
+        !matches!(self.current_mode, 
+            AppMode::RunningOllama 
+            | AppMode::Help 
+            | AppMode::Filter 
+            | AppMode::InstallSelectModelFilter
+        )
+    }
 }

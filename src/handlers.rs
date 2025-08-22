@@ -21,7 +21,7 @@ pub async fn handle_key_event(
 ) -> Result<bool> {
     if key.kind == KeyEventKind::Press || key.kind == KeyEventKind::Repeat {
         let mut handled_globally = false;
-        if app.current_mode != AppMode::RunningOllama && app.current_mode != AppMode::Help && app.current_mode != AppMode::Filter && app.current_mode != AppMode::InstallSelectModelFilter {
+        if app.is_global_key_handling_enabled() {
             match key.code {
                 KeyCode::Char('h') | KeyCode::Char('?') => {
                     app.previous_mode = Some(app.current_mode.clone());
