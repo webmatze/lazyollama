@@ -10,6 +10,10 @@ use ratatui::{
     Frame,
 };
 
+/// Cursor character for filter input fields
+/// Uses ASCII underline character for maximum terminal compatibility
+const CURSOR_CHAR: char = '_';
+
 fn draw_help_modal(f: &mut Frame) {
     let block = Block::default()
         .title("Help - Shortcuts")
@@ -159,8 +163,8 @@ fn draw_filter_input(f: &mut Frame, app: &AppState, area: Rect) {
     // Create the input display with cursor
     let mut input_display = app.filter_input.clone();
     if app.current_mode == AppMode::Filter {
-        // Insert cursor character at cursor position
-        input_display.insert(app.filter_cursor_pos, '█');
+        // Insert cursor character at cursor position (using ASCII-safe cursor)
+        input_display.insert(app.filter_cursor_pos, CURSOR_CHAR);
     }
 
     let input_paragraph = Paragraph::new(input_display)
@@ -402,8 +406,8 @@ fn draw_registry_filter_input(f: &mut Frame, app: &AppState, area: Rect) {
     // Create the input display with cursor
     let mut input_display = app.registry_filter_input.clone();
     if app.current_mode == AppMode::InstallSelectModelFilter {
-        // Insert cursor character at cursor position
-        input_display.insert(app.registry_filter_cursor_pos, '█');
+        // Insert cursor character at cursor position (using ASCII-safe cursor)
+        input_display.insert(app.registry_filter_cursor_pos, CURSOR_CHAR);
     }
 
     let input_paragraph = Paragraph::new(input_display)
